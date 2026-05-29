@@ -1,0 +1,26 @@
+{
+  "name": "generador-poo-multiclase",
+  "displayName": "Generador POO Multi-Clase",
+  "description": "Genera una clase padre y múltiples clases hijas conectadas a app.mjs en formato reducido",
+  "version": "1.0.0",
+  "publisher": "utnubu-g-dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jorgegodinez125/utnubu"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "generador-multiclase.crear",
+        "title": "Generar Estructura Multi-Clase Express"
+      }
+    ]
+  }
+}
