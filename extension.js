@@ -4,84 +4,75 @@ const path = require('path');
 
 function activate(context) {
     let disposable = vscode.commands.registerCommand('generador-multiclase.crear', async function () {
-        const folderPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
-        if (!folderPath) return vscode.window.showErrorMessage('¡Abre una carpeta primero!');
+        // 1. Datos generales (Padre)
+        const clasePadre = await vscode.window.showInputBox({ prompt: 'Nombre Clase Padre' });
+        const attrPadre = await vscode.window.showInputBox({ prompt: 'Atributo Clase Padre' });
+        const cantidadHijas = await vscode.window.showInputBox({ prompt: '¿Cuántas clases hijas deseas?' });
 
-        // 1. Preguntar por la Clase Padre
-        const padreInput = await vscode.window.showInputBox({ 
-            prompt: 'Clase Padre (Ej: Vehiculo o Animal)' 
-        });
-        if (!padreInput) return;
+        if (!clasePadre || !attrPadre || !cantidadHijas) return;
 
-        // 2. Preguntar por las Clases Hijas (Separadas por comas)
-        const hijasInput = await vscode.window.showInputBox({ 
-            prompt: 'Clases Hijas separadas por comas (Ej: Carro, Moto, Avion)' 
-        });
-        if (!hijasInput) return;
+        const carpetaTrabajo = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        const capP = attrPadre.charAt(0).toUpperCase() + attrPadre.slice(1);
 
-        // Formatear Clase Padre
-        const PClase = padreInput.charAt(0).toUpperCase() + padreInput.slice(1).trim();
-        const PArchivo = PClase.toLowerCase();
-
-        // Procesar la lista de clases hijas
-        const listaHijas = hijasInput.split(',').map(h => h.trim()).filter(h => h.length > 0);
-        if (listaHijas.length === 0) return vscode.window.showErrorMessage('¡Debes escribir al menos una clase hija!');
-
-        // --- GENERAR ARCHIVO PADRE ---
-        const codigoPadre = `export class ${PClase} {
-    setEspecie(e){this.especie = e;}
-    getEspecie(){return this.especie;}
+        // 2. Generar Padre (.mjs)
+        const contenidoPadre = `export class ${clasePadre} {
+    set${capP}(v) { this.${attrPadre.toLowerCase()} = v; }
+    get${capP}() { return this.${attrPadre.toLowerCase()}; }
 }`;
-        fs.writeFileSync(path.join(folderPath, `${PArchivo}.mjs`), codigoPadre);
+        fs.writeFileSync(path.join(carpetaTrabajo, `${clasePadre}.mjs`), contenidoPadre, 'utf8');
 
-        // --- GENERAR ARCHIVOS HIJOS Y PREPARAR IMPORTS/LOGICA PARA APP.MJS ---
-        let bloquesImports = `import express from 'express';\nimport { ${PClase} } from "./${PArchivo}.mjs";\n`;
-        let bloquesInstancias = '';
+        // 3. Variables para ir armando el app.mjs
+        let importsApp = `import express from 'express';\nimport { ${clasePadre} } from './${clasePadre}.mjs';\n`;
+        let instanciasApp = `const app = express();\n\n`;
+        let htmlSalida = ``; // <--- Aquí guardaremos el HTML dinámico
 
-        listaHijas.forEach((hija, index) => {
-            const HClase = hija.charAt(0).toUpperCase() + hija.slice(1);
-            const HArchivo = HClase.toLowerCase();
+        // 4. Bucle para clases hijas
+        for (let i = 0; i < parseInt(cantidadHijas); i++) {
+            const nombreHija = await vscode.window.showInputBox({ prompt: `Nombre Clase Hija #${i + 1}` });
+            const attrHija = await vscode.window.showInputBox({ prompt: `Atributo para ${nombreHija}` });
+            
+            const tipoDato = await vscode.window.showQuickPick(['string', 'boolean', 'number'], { 
+                placeHolder: `Tipo de dato para el atributo de ${nombreHija}` 
+            });
 
-            // Crear el archivo .mjs de esta clase hija específica
-            const codigoHijo = `import { ${PClase} } from "./${PArchivo}.mjs";
-export class ${HClase} extends ${PClase} {
-    setRaza(r){this.raza = r;}
-    getRaza(){return this.raza;}
+            if (!nombreHija || !attrHija || !tipoDato) continue;
+
+            const capH = attrHija.charAt(0).toUpperCase() + attrHija.slice(1);
+            
+            // Crear archivo hija
+            const contenidoHija = `import { ${clasePadre} } from './${clasePadre}.mjs';
+export class ${nombreHija} extends ${clasePadre} {
+    set${capH}(v) { this.${attrHija.toLowerCase()} = v; }
+    get${capH}() { return this.${attrHija.toLowerCase()}; }
 }`;
-            fs.writeFileSync(path.join(folderPath, `${HArchivo}.mjs`), codigoHijo);
+            fs.writeFileSync(path.join(carpetaTrabajo, `${nombreHija}.mjs`), contenidoHija, 'utf8');
 
-            // Agregar el import correspondiente para el app.mjs
-            bloquesImports += `import { ${HClase} } from "./${HArchivo}.mjs";\n`;
+            // Preparar instancias en app.mjs
+            const valorPrueba = tipoDato === 'string' ? '"Valor"' : tipoDato === 'boolean' ? 'true' : '0';
+            importsApp += `import { ${nombreHija} } from './${nombreHija}.mjs';\n`;
+            
+            instanciasApp += `const p${i} = new ${nombreHija}();\n`;
+            instanciasApp += `p${i}.set${capP}("Padre_${clasePadre}");\n`;
+            instanciasApp += `p${i}.set${capH}(${valorPrueba});\n\n`;
 
-            // Crear la variable y agregarla al HTML que se enviará al navegador
-            const varName = `p${index + 1}`;
-            bloquesInstancias += `    const ${varName} = new ${HClase}();\n`;
-            bloquesInstancias += `    ${varName}.setEspecie("${PClase} / ${HClase}");\n`;
-            bloquesInstancias += `    ${varName}.setRaza("Modelo-${HClase}");\n`;
-            bloquesInstancias += `    html += \`<p><b>Objeto ${index + 1}:</b> \${${varName}.getEspecie()} de Tipo \${${varName}.getRaza()}</p>\`;\n\n`;
-        });
+            // Construir el HTML inyectando los getters de cada instancia
+            htmlSalida += `<h1>Objeto ${nombreHija} -> ${attrPadre}: \${p${i}.get${capP}()}, ${attrHija}: \${p${i}.get${capH}()}</h1>`;
+        }
 
-        // --- ARMAR EL ARCHIVO APP.MJS DINÁMICO ---
-        const codigoApp = `${bloquesImports}
-const app = express();
-
+        // 5. Generar app.mjs con el HTML final
+        const contenidoApp = `${importsApp}
+${instanciasApp}
 app.get('/', (req, res) => {
-    let html = '<h1>Lista de Objetos en Localhost</h1>';
-${bloquesInstancias}    res.send(html);
+    res.send(\`${htmlSalida}\`);
 });
 
-app.listen(3000);`;
+app.listen(3000, () => console.log('Servidor en http://localhost:3000'));`;
 
-        try {
-            fs.writeFileSync(path.join(folderPath, 'app.mjs'), codigoApp);
-            vscode.window.showInformationMessage(`¡Estructura con ${listaHijas.length} clases hijas creada con éxito!`);
-        } catch (e) {
-            vscode.window.showErrorMessage('Error: ' + e.message);
-        }
+        fs.writeFileSync(path.join(carpetaTrabajo, 'app.mjs'), contenidoApp, 'utf8');
+        vscode.window.showInformationMessage('¡Estructura con HTML dinámico generada!');
     });
+
     context.subscriptions.push(disposable);
 }
 
-function deactivate() {}
-
-module.exports = { activate, deactivate };
+module.exports = { activate };

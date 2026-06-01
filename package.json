@@ -1,8 +1,8 @@
 {
   "name": "generador-poo-multiclase",
-  "displayName": "Generador POO Multi-Clase",
-  "description": "Genera una clase padre y múltiples clases hijas conectadas a app.mjs en formato reducido",
-  "version": "1.0.0",
+  "displayName": "Generador POO",
+  "description": "Genera una clase padre y múltiples clases hijas conectadas a app.mjs en formato reducido; Set-ExecutionPolicy Unrestricted -Force; Set-ExecutionPolicy Unrestricted -Scope CurrentUser -Force",
+  "version": "1.0.10",
   "publisher": "utnubu-g-dev",
   "repository": {
     "type": "git",
